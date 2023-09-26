@@ -139,9 +139,16 @@ To evalute SGHR on ETH, you can use the following commands:
 ```
 python Test.py --dataset ETH
 python Test_cycle.py --dataset ETH --topk 6 --inlierd 0.2 --tau_2 0.5 --rr
+python Test_cycle.py --dataset ETH --estimator 4DOF --topk 6 --inlierd 0.2 --tau_2 0.5 --rr
 ```
 
 To evalute SGHR on your own dataset, you can follow [here](data/Readme.md).
+
+```
+python Test.py --dataset WHU-TLS
+python Test_cycle.py --dataset WHU-TLS --topk 6 --inlierd 1 --tau_2 1 --rr
+python Test_cycle.py --dataset WHU-TLS --estimator 4DOF --topk 6 --inlierd 1 --tau_2 1 --rr
+```
 
 ## 💡 Citation
 

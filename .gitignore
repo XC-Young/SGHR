@@ -2,3 +2,5 @@ knn_search
 __pycache__
 pre
 data
+checkpoints
+.vscode

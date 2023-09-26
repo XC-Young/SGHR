@@ -207,6 +207,17 @@ def get_dataset_name(dataset_name,origin_data_dir):
             datasets[scenes[i]]=SceneDataset(root_dir,stationnums[i])
             datasets[scenes[i]].name=f'{dataset_name}/{scenes[i]}'
         return datasets
+    
+    if dataset_name=='WHU-TLS':
+        datasets={}
+        datasets['wholesetname']=f'{dataset_name}'
+        scenes=['Park','Mountain','Campus','RiverBank','UndergroundExcavation','Tunnel']
+        stationnums=[32,6,10,7,12,7]
+        for i in range(len(scenes)):
+            root_dir=f'{origin_data_dir}/{dataset_name}/'+scenes[i]
+            datasets[scenes[i]]=SceneDataset(root_dir,stationnums[i])
+            datasets[scenes[i]].name=f'{dataset_name}/{scenes[i]}'
+        return datasets
 
     else:
         raise NotImplementedError
@@ -270,6 +281,15 @@ class scenewisedataset(torch.utils.data.Dataset):
         pt = dataset.get_kps(pid)
         # load pre-calculated YOHO features
         feat = np.load(f'{self.d_feat}/{dataset.name}/yoho_desc/{pid}.npy')
+        return pt, feat
+    
+    def _load_pt_feat_4DOF(self, sn, pid):
+        # all base informations
+        dataset = self.datasets[sn]
+        # load point cloud
+        pt = dataset.get_kps(pid)
+        # load pre-calculated YOHO features
+        feat = np.load(f'{self.d_feat}/{dataset.name}/4DOF_desc/{pid}.npy')
         return pt, feat
     
     def _resample_point_cloud(self, points, feats):
@@ -360,6 +380,7 @@ class scenewisedataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         name2feat = {
             'yoho': self._load_pt_feat_yoho,
+            '4DOF': self._load_pt_feat_4DOF
         }
         # get the next item
         item_info = self.metadata[index]
