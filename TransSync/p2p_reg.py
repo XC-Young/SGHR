@@ -164,10 +164,46 @@ class yoho(p2preg):
         match = self.match(des0, des1)        
         T, ir, n_matches = self.ransac(keys0,keys1,match)
         self.save(dataset, id0, id1, T, ir, n_matches)
+        np.save(f'./pre/pairwise_registration/yoho/{dataset.name}/{id0}-{id1}.npy',match)
+        return T, ir, n_matches
+
+class YOHO4DOF(p2preg):
+    def get_des(self, dataset, sid):
+        desdir = f'data/{dataset.name}/4DOF_desc'
+        des = np.load(f'{desdir}/{sid}.npy')
+        return des
+    
+    def already_exists(self, dataset, id0, id1):
+        fn = f'./pre/pairwise_registration/4DOF/{dataset.name}/{id0}-{id1}.npz'
+        if os.path.exists(fn):
+            T = np.load(fn)
+            T, ir, n_matches = T['trans'], T['ir'], T['n_matches']
+            return True, T, ir, n_matches
+        else:
+            return False, None, None, None
+    
+    def save(self, dataset, id0, id1, T, ir, n_matches):
+        savedir = f'./pre/pairwise_registration/4DOF/{dataset.name}/'
+        make_non_exists_dir(savedir)
+        np.savez(f'{savedir}/{id0}-{id1}.npz', trans = T, ir = ir, n_matches = n_matches)
+        
+    def run(self, dataset, id0, id1):
+        sign, T, ir, n_matches = self.already_exists(dataset, id0, id1)
+        if sign:
+            return T, ir, n_matches
+        keys0 = dataset.get_kps(id0)
+        keys1 = dataset.get_kps(id1)
+        des0 = self.get_des(dataset, id0)
+        des1 = self.get_des(dataset, id1)
+        match = self.match(des0, des1)        
+        T, ir, n_matches = self.ransac(keys0,keys1,match)
+        self.save(dataset, id0, id1, T, ir, n_matches)
+        np.save(f'./pre/pairwise_registration/4DOF/{dataset.name}/{id0}-{id1}.npy',match)
         return T, ir, n_matches
 
 name2estimator={
     'yoho':yoho,
+    '4DOF':YOHO4DOF,
 }
 
         
