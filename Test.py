@@ -56,6 +56,7 @@ if __name__ == '__main__':
     testlists = {'3dmatch': './train/pkls/test_3dmatch.pkl',
                  'scannet': './train/pkls/test_scannet.pkl',
                  'WHU-TLS': './train/pkls/test_whu.pkl',
+                 'TLS_Dataset': './train/pkls/test_tls.pkl',
                  'ETH':     './train/pkls/test_eth.pkl'}
     
     cfg,_ = get_config()

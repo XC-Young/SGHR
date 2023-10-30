@@ -150,6 +150,12 @@ python Test_cycle.py --dataset WHU-TLS --topk 6 --inlierd 1 --tau_2 1 --rr
 python Test_cycle.py --dataset WHU-TLS --estimator 4DOF --topk 6 --inlierd 1 --tau_2 1 --rr
 ```
 
+```
+python Test.py --dataset TLS_Dataset
+python Test_cycle.py --dataset TLS_Dataset --topk 6 --inlierd 1 --tau_2 1 --rr
+python Test_cycle.py --dataset TLS_Dataset --estimator 4DOF --topk 6 --inlierd 1 --tau_2 1 --rr
+```
+
 ## 💡 Citation
 
 Please consider citing SGHR if this program benefits your project

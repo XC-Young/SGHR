@@ -27,7 +27,7 @@ class cycle_tester():
     def savepose(self, dataset, poses):
         make_non_exists_dir(f'{self.prepose_dir}/{dataset.name}')
         poses = poses.reshape(-1,4)
-        np.savetxt(f'{self.prepose_dir}/{dataset.name}/pose.txt', poses, delimiter=',')
+        np.savetxt(f'{self.prepose_dir}/{dataset.name}/pose.txt', poses, delimiter=' ')
     
     def savelog(self, dataset, trans):
         make_non_exists_dir(f'{self.prelog_dir}/{dataset.name}')
