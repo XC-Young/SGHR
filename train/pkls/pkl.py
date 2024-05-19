@@ -3,14 +3,14 @@ import numpy as np
 
 # rewrite to txt
 def rewrite():
-  f = open('/main/00_MINE/SGHR/train/pkls/test_whu.pkl','rb')
+  f = open('/yxc/main/00_MINE/SGHR/train/pkls/test_whu.pkl','rb')
   data = pickle.load(f)
   output = open('1.txt','a')
   print(data,file=output)
 
 # read
 def read():
-  with open('/main/00_MINE/SGHR/train/pkls/test_whu.pkl','rb') as f:
+  with open('/yxc/main/00_MINE/SGHR/train/pkls/test_whu.pkl','rb') as f:
     d_list = pickle.load(f)
     print(len(d_list))
     for i in range(len(d_list)):
