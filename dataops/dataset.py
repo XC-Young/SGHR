@@ -115,7 +115,7 @@ class SceneDataset(EvalDataset):
     def get_kps(self, cloud_id):
         if not os.path.exists(self.kps_pc_fn[int(cloud_id)]):
             pc=self.get_pc(cloud_id)
-            key_idxs=np.loadtxt(self.kps_fn[int(cloud_id)]).astype(np.int)
+            key_idxs=np.loadtxt(self.kps_fn[int(cloud_id)]).astype(np.int32)
             keys=pc[key_idxs]
             make_non_exists_dir(f'{self.root}/Keypoints_PC')
             np.save(self.kps_pc_fn[int(cloud_id)],keys)
