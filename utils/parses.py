@@ -16,8 +16,8 @@ Dataset_Args=add_argument_group('Dataset')
 Train_Args=add_argument_group("Training_Args")
 Val_Args=add_argument_group("Validation_Args")
 
-backbone = '4DOF'
-# backbone = 'yoho'
+# backbone = '4DOF'
+backbone = 'yoho'
 
 ############################################# Base ###################################################
 #Dirs

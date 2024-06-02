@@ -1,38 +1,28 @@
 import numpy as np
 import argparse
 from tqdm import tqdm
-import time
 import os
 import torch
 from utils.utils import transform_points,make_non_exists_dir
 from dataops.dataset import get_dataset_name
 from utils.r_eval import compute_R_diff
-import res_scorer.parses as parses
-from res_scorer.detector import detector
-from res_scorer.extractor import extractor
-from res_scorer.network import Scorer
+from scorer.ptv3.dataops.scorer_transform import TEST_TRANSFORM
+from scorer.ptv3.Classifier import Classifier
 
-start = time.perf_counter()
 parser = argparse.ArgumentParser()
-config,nouse = parses.get_config()
+parser.add_argument('--num_classes',type=int,default=1)
+parser.add_argument('--backbone_embed_dim',type=int,default=512)
+parser.add_argument('--testset',type=str,default='3dmatch',help='dataset name')
+parser.add_argument('--best_model_fn',type=str,default='./scorer/model_best.pth')
+parser.add_argument('--origin_data_dir',type=str,default='./data')
+parser.add_argument('--pre_dir',type=str,default='./pre/cycle_results/cycle_prelogs')
+parser.add_argument('--save_dir',type=str,default='./scorer/result')
+parser.add_argument('--dsp_voxel_size',type=float,default=0.03)
+config = parser.parse_args()
 
-datasets = get_dataset_name(config.testset,config.origin_data_dir)
-datasetname=datasets['wholesetname']
-
-detctor = detector(config)
-extor = extractor(config)
-
-if not os.path.exists(f'{config.kps_dir}/{config.testset}'):
-    print('---> generate keypoints')
-    detctor.curvature_kps(datasets)
-
-if not os.path.exists(f'{config.fcgf_reg_dir}/{config.testset}'):
-    print('---> extract FCGF feature')
-    extor.batch_feature_extraction()
-
+transformer = TEST_TRANSFORM()
 # load model
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-network = Scorer(config).to(device)
+network = Classifier(config).cuda()
 def load_model(config,network):
     best_para = 0
     if os.path.exists(config.best_model_fn):
@@ -43,8 +33,10 @@ def load_model(config,network):
     else:
         raise ValueError("No model exists")
 load_model(config, network)
+network.eval()
 
-pre_dir = f'./pre/cycle_results/cycle_prelogs'
+datasets = get_dataset_name(config.testset,config.origin_data_dir)
+datasetname=datasets['wholesetname']
 for scene,dataset in tqdm(datasets.items()):
     if scene=='wholesetname':continue
     if scene=='valscenes':continue
@@ -52,11 +44,9 @@ for scene,dataset in tqdm(datasets.items()):
         datasetname=f'3d{dataset.name[4:]}'
     else:
         datasetname=dataset.name
-    Keys_dir=f'{config.kps_dir}/{datasetname}/Keypoints_PC'
-    feats_dir=f'{config.fcgf_reg_dir}/{datasetname}/FCGF_feature'
     
     # load pre transformation
-    pre_fn = f'{pre_dir}/{datasetname}/pre.log'
+    pre_fn = f'{config.pre_dir}/{datasetname}/pre.log'
     pair_trans = {}
     with open(pre_fn,'r') as f:
         lines = f.readlines()
@@ -78,30 +68,36 @@ for scene,dataset in tqdm(datasets.items()):
     correct_num = 0
     for pair in tqdm(dataset.pair_ids):
         id0,id1 = pair
-        #Keypoints
-        Keys0=np.load(f'{Keys_dir}/cloud_bin_{id0}Keypoints.npy').astype(np.float32)
-        Keys1=np.load(f'{Keys_dir}/cloud_bin_{id1}Keypoints.npy').astype(np.float32)
+        pcd0 = dataset.get_pc_o3d(id0)
+        pcd1 = dataset.get_pc_o3d(id1)
+        pcd0 = pcd0.voxel_down_sample(config.dsp_voxel_size)
+        pcd1 = pcd1.voxel_down_sample(config.dsp_voxel_size)
+        pc0 = np.asarray(pcd0.points)
+        pc1 = np.asarray(pcd1.points)
         trans = pair_trans[f'{id0}-{id1}']
-        Keys1 = transform_points(Keys1,trans)
-        #features
-        feats0 = np.load(f'{feats_dir}/{id0}.npy').astype(np.float32)
-        feats1 = np.load(f'{feats_dir}/{id1}.npy').astype(np.float32)
-        inkeys0 = torch.from_numpy(Keys0.reshape(1,-1,Keys0.shape[1]).astype(np.float32)).to(device)
-        inkeys1 = torch.from_numpy(Keys1.reshape(1,-1,Keys1.shape[1]).astype(np.float32)).to(device)
-        infeats0 = torch.from_numpy(feats0.reshape(1,-1,feats0.shape[1]).astype(np.float32)).to(device) 
-        infeats1 = torch.from_numpy(feats1.reshape(1,-1,feats1.shape[1]).astype(np.float32)).to(device)
-        score = network(inkeys0, inkeys1, infeats0, infeats1)
-        prediction = torch.round(torch.sigmoid(score)).int().cpu().numpy()
+        pc1 = transform_points(pc1,trans)
+
+        xyzp0 = np.c_[pc0,np.zeros(pc0.shape[0]).T]
+        xyzp1 = np.c_[pc1,np.ones(pc1.shape[0]).T]
+        xyzp = np.concatenate((xyzp0,xyzp1),axis=0)
+        coord = xyzp[:,0:3].astype(np.float32)
+        pc_idx = xyzp[:,3].astype(np.int32).reshape(-1,1)
+        data_dict = transformer(coord,pc_idx)
+        for key,val in data_dict.items():
+            data_dict[key] = data_dict[key].cuda()
+        cls_logits = network(data_dict)
+        prediction = torch.sigmoid(cls_logits).detach().cpu().numpy()
+        pre_int = int(np.round(prediction))
 
         gt = dataset.get_transform(id0,id1)
         tdiff = np.linalg.norm(trans[0:3,-1]-gt[0:3,-1])
         Rdiff=compute_R_diff(gt[0:3,0:3],trans[0:3,0:3])
         right = 0
-        if Rdiff<3 and tdiff<0.2 :
+        if Rdiff<15 and tdiff<0.3 :
             right = 1
-        if right == int(prediction):
+        if right == pre_int:
             correct_num += 1
-        writer.write(f'{id0}-{id1}: pre:{int(prediction)} true:{right}  RRE:{Rdiff}   RTE:{tdiff}\n')
+        writer.write(f'{id0}-{id1}: pre:{prediction}  pre:{pre_int}  true:{right}   RRE:{Rdiff}  RTE:{tdiff}\n')
     recall = correct_num/len(dataset.pair_ids)
     writer.write(f'recall:{recall}')
     writer.close()

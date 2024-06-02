@@ -1,6 +1,7 @@
 knn_search
 __pycache__
-pre
+pre*
 data
 checkpoints
 .vscode
+model_best.pth
