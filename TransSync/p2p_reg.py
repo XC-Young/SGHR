@@ -4,6 +4,7 @@ import open3d
 import numpy as np
 from utils.knn_search import knn_module
 from utils.utils import make_non_exists_dir,transform_points
+import utils.utils as utils
 
 class refiner():
     def __init__(self):
@@ -91,11 +92,14 @@ class p2preg():
         target_pcd = open3d.geometry.PointCloud()
         target_pcd.points = open3d.utility.Vector3dVector(keys1)
         coors = open3d.utility.Vector2iVector(match)
-        result = open3d.registration.registration_ransac_based_on_correspondence(
-        source_pcd, target_pcd, coors,
-        self.inlierd,
-        open3d.registration.TransformationEstimationPointToPoint(False), 3,
-        open3d.registration.RANSACConvergenceCriteria(self.iters, 1000))            
+        result = open3d.pipelines.registration.registration_ransac_based_on_correspondence(
+        source = source_pcd, 
+        target = target_pcd, 
+        corres = coors,
+        max_correspondence_distance = self.inlierd,
+        estimation_method = open3d.pipelines.registration.TransformationEstimationPointToPoint(False), 
+        ransac_n = 3,
+        criteria = open3d.pipelines.registration.RANSACConvergenceCriteria(self.iters, 1000))            
         trans = result.transformation
         trans = np.linalg.inv(trans)
         
@@ -167,6 +171,55 @@ class yoho(p2preg):
         np.save(f'./pre/pairwise_registration/yoho/{dataset.name}/{id0}-{id1}.npy',match)
         return T, ir, n_matches
 
+class yoho_score(p2preg):
+    def get_des(self, dataset, sid):
+        desdir = f'data/{dataset.name}/yoho_desc'
+        des = np.load(f'{desdir}/{sid}.npy')
+        return des
+    
+    def already_exists(self, dataset, id0, id1):
+        fn = f'./pre/pairwise_registration/yoho/{dataset.name}/{id0}-{id1}.npz'
+        if os.path.exists(fn):
+            T = np.load(fn)
+            T, ir, n_matches, score = T['trans'], T['ir'], T['n_matches'], T['score']
+            return True, T, ir, n_matches, score
+        else:
+            return False, None, None, None, None
+    
+    def save(self, dataset, id0, id1, T, ir, n_matches, score):
+        savedir = f'./pre/pairwise_registration/yoho/{dataset.name}/'
+        make_non_exists_dir(savedir)
+        np.savez(f'{savedir}/{id0}-{id1}.npz', trans = T, ir = ir, n_matches = n_matches, score = score)
+        
+    def run(self, dataset, id0, id1, network, transformer, voxel_size):
+        sign, T, ir, n_matches, score= self.already_exists(dataset, id0, id1)
+        if sign:
+            return T, ir, n_matches, score
+        keys0 = dataset.get_kps(id0)
+        keys1 = dataset.get_kps(id1)
+        des0 = self.get_des(dataset, id0)
+        des1 = self.get_des(dataset, id1)
+        match = self.match(des0, des1)        
+        T, ir, n_matches = self.ransac(keys0,keys1,match)
+        # scorer
+        pc0 = dataset.get_pc(id0)
+        pc1 = dataset.get_pc(id1)
+        trans = T
+        pc1 = transform_points(pc1,trans)
+
+        xyzp0 = np.c_[pc0,np.zeros(pc0.shape[0]).T]
+        xyzp1 = np.c_[pc1,np.ones(pc1.shape[0]).T]
+        xyzp = np.concatenate((xyzp0,xyzp1),axis=0)
+        coord = xyzp[:,0:3].astype(np.float32)
+        pc_idx = xyzp[:,3].astype(np.int32).reshape(-1,1)
+        data_dict = transformer(coord,pc_idx)
+        data_dict = utils.to_cuda(data_dict)
+        cls_logits = network(data_dict)
+        score = torch.sigmoid(cls_logits).detach().cpu().numpy()
+        self.save(dataset, id0, id1, T, ir, n_matches, score)
+        np.save(f'./pre/pairwise_registration/yoho/{dataset.name}/{id0}-{id1}.npy',match)
+        return T, ir, n_matches, score
+
 class YOHO4DOF(p2preg):
     def get_des(self, dataset, sid):
         desdir = f'data/{dataset.name}/4DOF_desc'
@@ -204,6 +257,7 @@ class YOHO4DOF(p2preg):
 name2estimator={
     'yoho':yoho,
     '4DOF':YOHO4DOF,
+    'yoho_score':yoho_score
 }
 
         

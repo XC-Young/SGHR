@@ -7,7 +7,18 @@ from utils.utils import make_non_exists_dir
 from dataops.dataset import get_dataset_name
 from TransSync.p2p_reg import name2estimator
 from TransSync.Laplacian_TS import pair2globalT_cycle
+from scorer.ptv3.dataops.scorer_transform import TEST_TRANSFORM
+from scorer.ptv3.Classifier import Classifier
 
+def load_model(config,network):
+    best_para = 0
+    if os.path.exists(config.best_model_fn):
+        checkpoint=torch.load(config.best_model_fn)
+        best_para = checkpoint['best_para']
+        network.load_state_dict(checkpoint['network_state_dict'])
+        print(f'\n ==> resuming best para {best_para}')
+    else:
+        raise ValueError("No model exists")
 
 class cycle_tester():
     def __init__(self, cfg):
@@ -23,6 +34,13 @@ class cycle_tester():
         #for RR
         self.tau_2 = self.cfg.tau_2
         self.nonconsecutive = True
+        if self.cfg.scorer:
+            self.estimator = name2estimator[f'{args.estimator}_score'](self.cfg)
+            self.dsp_voxel_size = cfg.dsp_voxel_size
+            self.transformer = TEST_TRANSFORM()
+            self.network = Classifier(cfg).cuda()
+            load_model(cfg,self.network)
+            self.network.eval()
     
     def savepose(self, dataset, poses):
         make_non_exists_dir(f'{self.prepose_dir}/{dataset.name}')
@@ -121,8 +139,12 @@ class cycle_tester():
                     weights[i,j] = 1     
                     weights[j,i] = 1    
                     # If we haven't load the trans and the inv trans, we load the pairwise transformation
-                    if np.sum(np.abs(Ts[i,j,0:3,0:3]))<0.001:                    
-                        Tij, ir, n_matches = self.estimator.run(dataset, i, j)
+                    if np.sum(np.abs(Ts[i,j,0:3,0:3]))<0.001:  
+                        if self.cfg.scorer:
+                            Tij, ir, n_matches, score = self.estimator.run(dataset, i, j, self.network, self.transformer, self.dsp_voxel_size)
+                            weights[i,j], weights[j,i] = score, score
+                        else:
+                            Tij, ir, n_matches = self.estimator.run(dataset, i, j)
                         # guarantee meaningful rotation matrix
                         if np.linalg.det(Tij[0:3,0:3])<0:
                             Tij[0:2] = Tij[[1,0]]
@@ -229,6 +251,11 @@ if __name__ == '__main__':
     
     parser.add_argument('--tau_2',           default=0.2,    type=float,   help='Thres for RR')
     
+    parser.add_argument('--num_classes',type=int,default=1)
+    parser.add_argument('--backbone_embed_dim',type=int,default=512)
+    parser.add_argument('--best_model_fn',type=str,default='./scorer/model_best.pth')
+    parser.add_argument('--dsp_voxel_size',type=float,default=0.03)
+    parser.add_argument('--scorer',type=bool,default=True)
     
     args = parser.parse_args()
     

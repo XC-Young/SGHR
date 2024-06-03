@@ -68,12 +68,14 @@ for scene,dataset in tqdm(datasets.items()):
     correct_num = 0
     for pair in tqdm(dataset.pair_ids):
         id0,id1 = pair
-        pcd0 = dataset.get_pc_o3d(id0)
-        pcd1 = dataset.get_pc_o3d(id1)
-        pcd0 = pcd0.voxel_down_sample(config.dsp_voxel_size)
-        pcd1 = pcd1.voxel_down_sample(config.dsp_voxel_size)
-        pc0 = np.asarray(pcd0.points)
-        pc1 = np.asarray(pcd1.points)
+        # pcd0 = dataset.get_pc_o3d(id0)
+        # pcd1 = dataset.get_pc_o3d(id1)
+        # pcd0 = pcd0.voxel_down_sample(config.dsp_voxel_size)
+        # pcd1 = pcd1.voxel_down_sample(config.dsp_voxel_size)
+        # pc0 = np.asarray(pcd0.points)
+        # pc1 = np.asarray(pcd1.points)
+        pc0 = dataset.get_pc(id0)
+        pc1 = dataset.get_pc(id1)
         trans = pair_trans[f'{id0}-{id1}']
         pc1 = transform_points(pc1,trans)
 
