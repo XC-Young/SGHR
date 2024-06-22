@@ -202,8 +202,12 @@ class yoho_score(p2preg):
         match = self.match(des0, des1)        
         T, ir, n_matches = self.ransac(keys0,keys1,match)
         # scorer
-        pc0 = dataset.get_pc(id0)
-        pc1 = dataset.get_pc(id1)
+        pcd0 = dataset.get_pc_o3d(id0)
+        pcd1 = dataset.get_pc_o3d(id1)
+        pcd0 = pcd0.voxel_down_sample(voxel_size)
+        pcd1 = pcd1.voxel_down_sample(voxel_size)
+        pc0 = np.asarray(pcd0.points)
+        pc1 = np.asarray(pcd1.points)
         trans = T
         pc1 = transform_points(pc1,trans)
 

@@ -8,7 +8,7 @@ class TEST_TRANSFORM():
         ]
         voxelize = dict(
                 type="GridSample",
-                grid_size=0.02,
+                grid_size=0.03,
                 hash_type="fnv",
                 mode="train",
                 keys=("coord", "pc_idx"),
